@@ -11,6 +11,8 @@ import Kingfisher
 
 class UserProfileViewController: UIViewController {
     
+    let network = NetworkService(configuration: .default)
+    
     // setupUI
     // search control
     // network
@@ -31,7 +33,7 @@ class UserProfileViewController: UIViewController {
         embedSearchControl()
         bind()
     }
-
+    
     private func setupUI() {
         thumbnail.layer.cornerRadius = 80
     }
@@ -76,7 +78,7 @@ class UserProfileViewController: UIViewController {
         // url -> image
         // kingFisher 오픈소스 이용
         self.thumbnail.kf.setImage(with: user.avatarUrl)
-
+        
     }
 }
 
@@ -95,38 +97,33 @@ extension UserProfileViewController: UISearchBarDelegate {
         
         guard let keyword = searchBar.text, !keyword.isEmpty else { return }
         
-        let base = "https://api.github.com/"
-        let path = "users/\(keyword)"
-        let params: [String: String] = [:]
-        let header: [String: String] = ["Content-Type": "application/json"]
+        // Resource
+        //        let base = "https://api.github.com/"
+        //        let path = "users/\(keyword)"
+        //        let params: [String: String] = [:]
+        //        let header: [String: String] = ["Content-Type": "application/json"]
+        //
+        //        var urlComponent = URLComponents(string: base + path)!
+        //        let queryItems = params.map { (key: String, value: String) in
+        //            return URLQueryItem(name: key, value: value)
+        //        }
+        //        urlComponent.queryItems = queryItems
+        //
+        //        var request = URLRequest(url: urlComponent.url!)
+        //        header.forEach { (key: String, value: String) in
+        //            request.addValue(value, forHTTPHeaderField: key)
+        //        }
+        let resource = Resource<UserProfile>(
+            base: "https://api.github.com/",
+            path: "users/\(keyword)",
+            params: [:],
+            header: ["Content-Type": "application/json"])
         
-        var urlComponent = URLComponents(string: base + path)!
-        let queryItems = params.map { (key: String, value: String) in
-            return URLQueryItem(name: key, value: value)
-        }
-        urlComponent.queryItems = queryItems
-        
-        var request = URLRequest(url: urlComponent.url!)
-        header.forEach { (key: String, value: String) in
-            request.addValue(value, forHTTPHeaderField: key)
-        }
-        
-        URLSession.shared
-            .dataTaskPublisher(for: request)
-            .tryMap { result -> Data in
-                guard let response = result.response as? HTTPURLResponse,
-                      (200..<300).contains(response.statusCode) else {
-                    let response = result.response as? HTTPURLResponse
-                    let statusCode = response?.statusCode ?? -1
-                    throw NetworkError.responseError(statusCode: statusCode)
-                }
-                return result.data
-            }
-            .decode(type: UserProfile.self, decoder: JSONDecoder())
+        // NetworkService
+        // resource에서 url request를 뽑아서 세션에게 request에 필요한 data task 만들어달라고 한 후, data 받아 넘겨줌
+        network.load(resource)
             .receive(on: RunLoop.main)
             .sink { completion in
-                print("copletion: \(completion)")
-                
                 switch completion {
                 case .failure(let error):
                     self.user = nil
@@ -134,7 +131,33 @@ extension UserProfileViewController: UISearchBarDelegate {
                 }
             } receiveValue: { user in
                 self.user = user
-            }.store(in: &subscriptions)     // 계속 data 받을 수 있게
-
+            }.store(in: &subscriptions)
+                
+                
+                //        URLSession.shared
+                //            .dataTaskPublisher(for: request)
+                //            .tryMap { result -> Data in
+                //                guard let response = result.response as? HTTPURLResponse,
+                //                      (200..<300).contains(response.statusCode) else {
+                //                    let response = result.response as? HTTPURLResponse
+                //                    let statusCode = response?.statusCode ?? -1
+                //                    throw NetworkError.responseError(statusCode: statusCode)
+                //                }
+                //                return result.data
+                //            }
+                //            .decode(type: UserProfile.self, decoder: JSONDecoder())
+                //            .receive(on: RunLoop.main)
+                //            .sink { completion in
+                //                print("copletion: \(completion)")
+                //
+                //                switch completion {
+                //                case .failure(let error):
+                //                    self.user = nil
+                //                case .finished: break
+                //                }
+                //            } receiveValue: { user in
+                //                self.user = user
+                //            }.store(in: &subscriptions)     // 계속 data 받을 수 있게
+                
+            }
     }
-}
